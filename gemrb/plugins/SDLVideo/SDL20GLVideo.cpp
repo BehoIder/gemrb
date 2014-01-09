@@ -1,11 +1,15 @@
 #ifdef USE_GL
 #include <GL/glew.h>
+#ifdef _MSC_VER
 #pragma comment(lib, "glew32")
 #pragma comment(lib, "opengl32")
+#endif
 #else
 #include <GLES2/GL2.h>
 #include <GLES2/GL2ext.h>
+#ifdef _MSC_VER
 #pragma comment(lib, "libGLESv2")
+#endif
 #endif
 #include "SDL20GLVideo.h"
 #include "Interface.h"
@@ -178,6 +182,7 @@ int GLVideoDriver::CreateDisplay(int w, int h, int bpp, bool fs, const char* tit
 		return GEM_ERROR;
 	}
 	SDL_GL_MakeCurrent(window, context);
+	//GLenum e = glGetError();
 
 	renderer = SDL_CreateRenderer(window, -1, 0);
 
@@ -361,25 +366,25 @@ void GLVideoDriver::blitSprite(GLTextureSprite2D* spr, int x, int y, const Regio
 	if (flags & BLIT_MIRRORX) hflip = !hflip;
 	if (flags & BLIT_MIRRORY) vflip = !vflip;
 	GLfloat* textureCoords;
+	GLfloat coordsHV[] = { 1.0f,1.0f, 0.0f,1.0f, 1.0f,0.0f, 0.0f,0.0f };
+	GLfloat coordsH[] = { 1.0f,0.0f, 0.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f };
+	GLfloat coordsV[] = { 0.0f,1.0f, 1.0f,1.0f, 0.0f,0.0f, 1.0f,0.0f };
+	GLfloat coordsN[] = { 0.0f,0.0f, 1.0f,0.0f, 0.0f,1.0f, 1.0f,1.0f };
 	if (hflip && vflip)
 	{
-		GLfloat coords[] = { 1.0f,1.0f, 0.0f,1.0f, 1.0f,0.0f, 0.0f,0.0f };
-		textureCoords = coords;
+		textureCoords = coordsHV;
 	}
 	else if (hflip)
 	{
-		GLfloat coords[] = { 1.0f,0.0f, 0.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f };
-		textureCoords = coords;
+		textureCoords = coordsH;
 	}
 	else if (vflip)
 	{
-		GLfloat coords[] = { 0.0f,1.0f, 1.0f,1.0f, 0.0f,0.0f, 1.0f,0.0f };
-		textureCoords = coords;
+		textureCoords = coordsV;
 	}
 	else
 	{
-		GLfloat coords[] = { 0.0f,0.0f, 1.0f,0.0f, 0.0f,1.0f, 1.0f,1.0f };
-		textureCoords = coords;
+		textureCoords = coordsN;
 	}
 
 	// alpha modifier
@@ -541,7 +546,7 @@ void GLVideoDriver::BlitGameSprite(const Sprite2D* spr, int x, int y, unsigned i
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, glSprite->Width, glSprite->Height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, (GLvoid*) data);
-			delete data;
+			delete[] data;
 			flags |= BLIT_EXTERNAL_MASK;
 		}
 
@@ -591,7 +596,7 @@ void GLVideoDriver::DrawRect(const Region& rgn, const Color& color, bool fill, b
 	}
 }
 
-void GLVideoDriver::DrawHLine(short x1, short y, short x2, const Color& color, bool clipped)
+void GLVideoDriver::DrawHLine(short x1, short y, short x2, const Color& color, bool /*clipped*/)
 {
 	Region rgn;
 	rgn.x = x1;
@@ -601,7 +606,7 @@ void GLVideoDriver::DrawHLine(short x1, short y, short x2, const Color& color, b
 	return drawColoredRect(rgn, color);
 }
 
-void GLVideoDriver::DrawVLine(short x, short y1, short y2, const Color& color, bool clipped)
+void GLVideoDriver::DrawVLine(short x, short y1, short y2, const Color& color, bool /*clipped*/)
 {
 	Region rgn;
 	rgn.x = x;
@@ -661,6 +666,11 @@ int GLVideoDriver::SwapBuffers()
 	SDL_GL_SwapWindow(window);
 	core->RedrawAll();
 	spritesPerFrame = 0;
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_SCISSOR_TEST);
+
 	return val;
 }
 
