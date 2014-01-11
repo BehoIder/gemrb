@@ -98,6 +98,7 @@ static int ItemSoundsCount = -1;
 #define CRI_REMOVE 0
 #define CRI_EQUIP  1
 #define CRI_SWAP   2
+#define CRI_REMOVEFORSWAP 3
 
 //bit used in SetCreatureStat to access some fields
 #define EXTRASETTINGS 0x1000
@@ -6458,6 +6459,8 @@ static void ReadUsedItems()
 			//1 - named actor cannot remove it
 			//2 - anyone else cannot equip it
 			//4 - can only swap it for something else
+			//8 - (pst) can only be equipped in eye slots
+			//16 - (pst) can only be equipped in ear slots
 			UsedItems[i].flags = atoi(tab->QueryField(i,2) );
 		}
 table_loaded:
@@ -7477,12 +7480,46 @@ int CheckRemoveItem(Actor *actor, CREItem *si, int action)
 				if (!nomatch) continue;
 			} else continue;
 			break;
+		//the named actor cannot remove it except when initiating a swap (used for plain inventory slots)
+		// and make sure not to treat earrings improperly
+		case CRI_REMOVEFORSWAP:
+			int flags = UsedItems[i].flags;
+			if ((flags&1 && flags&4) || !(flags&15)) {
+				continue;
+			} // no continue
+			break;
 		}
 
 		displaymsg->DisplayString(UsedItems[i].value, DMC_WHITE, IE_STR_SOUND);
 		return 1;
 	}
 	return 0;
+}
+
+// TNO has an ear and an eye slot that share the same slot type, so normal checks fail
+// return false if we're trying to stick an earing into our eye socket or vice versa
+bool CheckEyeEarMatch(CREItem *NewItem, int Slot) {
+	if (UsedItemsCount==-1) {
+		ReadUsedItems();
+	}
+	unsigned int i=UsedItemsCount;
+
+	while(i--) {
+		if (UsedItems[i].itemname[0] && strnicmp(UsedItems[i].itemname, NewItem->ItemResRef, 8)) {
+			continue;
+		}
+
+		//8 - (pst) can only be equipped in eye slots
+		//16 - (pst) can only be equipped in ear slots
+		if (UsedItems[i].flags & 8) {
+			return Slot == 1; // eye/left ear/helmet
+		} else if (UsedItems[i].flags & 16) {
+			return Slot == 7; //right ear/caleidoscope
+		}
+
+		return true;
+	}
+	return true;
 }
 
 CREItem *TryToUnequip(Actor *actor, unsigned int Slot, unsigned int Count)
@@ -7495,8 +7532,13 @@ CREItem *TryToUnequip(Actor *actor, unsigned int Slot, unsigned int Count)
 	}
 
 	//it is always possible to put these items into the inventory
-	if (!(core->QuerySlotType(Slot)&SLOT_INVENTORY)) {
-		bool isdragging = core->GetDraggedItem()!=NULL;
+	// however in pst, we need to ensure immovable swappables are swappable
+	bool isdragging = core->GetDraggedItem() != NULL;
+	if (core->QuerySlotType(Slot)&SLOT_INVENTORY) {
+		if (CheckRemoveItem(actor, si, CRI_REMOVEFORSWAP)) {
+			return NULL;
+		}
+	} else {
 		if (CheckRemoveItem(actor, si, isdragging?CRI_SWAP:CRI_REMOVE)) {
 			return NULL;
 		}
@@ -7771,6 +7813,11 @@ static PyObject* GemRB_DropDraggedItem(PyObject * /*self*/, PyObject* args)
 		if (res) {
 			displaymsg->DisplayConstantString(res, DMC_WHITE);
 			return PyInt_FromLong( 0 );
+		}
+		// pst: also check TNO earing/eye silliness: both share the same slot type
+		if (Slottype == 1 && !CheckEyeEarMatch(slotitem, Slot)) {
+			displaymsg->DisplayConstantString(STR_WRONGITEMTYPE, DMC_WHITE);
+			return PyInt_FromLong(0);
 		}
 		CREItem *tmp = TryToUnequip(actor, Slot, 0 );
 		if (tmp) {
