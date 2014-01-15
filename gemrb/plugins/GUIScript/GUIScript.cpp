@@ -2848,7 +2848,7 @@ static PyObject* GemRB_WorldMap_GetDestinationArea(PyObject * /*self*/, PyObject
 }
 
 PyDoc_STRVAR( GemRB_Window_CreateWorldMapControl__doc,
-"CreateWorldMapControl(WindowIndex, ControlID, x, y, w, h, direction[, font])\n\n"
+"CreateWorldMapControl(WindowIndex, ControlID, x, y, w, h, direction[, font, recolor])\n\n"
 "Creates and adds a new WorldMap control to a Window." );
 
 static PyObject* GemRB_Window_CreateWorldMapControl(PyObject * /*self*/, PyObject* args)
@@ -10608,6 +10608,29 @@ static PyObject* GemRB_Log(PyObject* /*self*/, PyObject* args)
 	return Py_None;
 }
 
+
+PyDoc_STRVAR( GemRB_SetFeature__doc,
+"GemRB.SetFeature(feature, value)\n\n"
+"Set GameType flag FEATURE to VALUE, either True or False. \n"
+"FEATURE is defined by GF_xxx defines.\n"
+"Example:\n"
+"GemRB.SetFeature(GF_ALL_STRINGS_TAGGED, True)\n");
+
+static PyObject* GemRB_SetFeature(PyObject* /*self*/, PyObject* args)
+{
+	unsigned int feature;
+	bool value;
+
+	if (!PyArg_ParseTuple(args, "ib", &feature, &value)) {
+		return NULL;
+	}
+
+	core->SetFeature(value, feature);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+
 static PyMethodDef GemRBMethods[] = {
 	METHOD(ActOnPC, METH_VARARGS),
 	METHOD(AddGameTypeHint, METH_VARARGS),
@@ -10775,6 +10798,7 @@ static PyMethodDef GemRBMethods[] = {
 	METHOD(SetDefaultActions, METH_VARARGS),
 	METHOD(SetEquippedQuickSlot, METH_VARARGS),
 	METHOD(SetFeat, METH_VARARGS),
+	METHOD(SetFeature, METH_VARARGS),
 	METHOD(SetFullScreen, METH_VARARGS),
 	METHOD(SetGamma, METH_VARARGS),
 	METHOD(SetGlobal, METH_VARARGS),
